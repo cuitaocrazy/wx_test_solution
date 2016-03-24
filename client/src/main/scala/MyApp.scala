@@ -27,7 +27,7 @@ class SClient(eventGroup: NioEventLoopGroup) {
             override def channelRead0(ctx: ChannelHandlerContext, request: FullHttpRequest): Unit = {
               if (request.getUri.startsWith("/close?id=")) {
                 val id = request.getUri.substring(10).toInt
-                map.get(id).foreach(_.close())
+                map.remove(id).foreach(_.close())
 
                 ctx.writeAndFlush(createOkResp(request, id))
               } else {
