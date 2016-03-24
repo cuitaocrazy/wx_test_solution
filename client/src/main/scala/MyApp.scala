@@ -24,27 +24,27 @@ class SClient(eventGroup: NioEventLoopGroup) {
           .addLast(new HttpObjectAggregator(1024 * 1024))
           //.addLast(new LoggingHandler(LogLevel.INFO))
           .addLast(new SimpleChannelInboundHandler[FullHttpRequest]() {
-            override def channelRead0(ctx: ChannelHandlerContext, request: FullHttpRequest): Unit = {
-              if (request.getUri.startsWith("/close?id=")) {
-                val id = request.getUri.substring(10).toInt
-                map.remove(id).foreach(_.close())
+          override def channelRead0(ctx: ChannelHandlerContext, request: FullHttpRequest): Unit = {
+            if (request.getUri.startsWith("/close?id=")) {
+              val id = request.getUri.substring(10).toInt
+              map.get(id).foreach(_.close())
 
+              ctx.writeAndFlush(createOkResp(request, id))
+            } else {
+              val id = request.headers().get("_id").toInt
+
+              val clientChannel = map.getOrElse(id, createChannel(id))
+
+              if (clientChannel == null) {
                 ctx.writeAndFlush(createOkResp(request, id))
               } else {
-                val id = request.headers().get("_id").toInt
-
-                val clientChannel = map.getOrElse(id, createChannel(id))
-
-                if(clientChannel == null) {
-                  ctx.writeAndFlush(createOkResp(request, id))
-                } else {
-                  request.headers().remove("_id")
-                  request.retain()
-                  clientChannel.writeAndFlush(request)
-                }
+                request.headers().remove("_id")
+                request.retain()
+                clientChannel.writeAndFlush(request)
               }
             }
-          })
+          }
+        })
       }
     }).connect(ip, port).addListener(new ChannelFutureListener {
     override def operationComplete(future: ChannelFuture): Unit = {
@@ -59,9 +59,9 @@ class SClient(eventGroup: NioEventLoopGroup) {
         do {
           print("连接已关闭,是否重连y, n(默认y):")
           input = StdIn.readLine()
-        } while(input != "" && input != "y" && input != "n")
+        } while (input != "" && input != "y" && input != "n")
 
-        if(input == "n") {
+        if (input == "n") {
           eventGroup.shutdownGracefully()
         } else {
           new SClient(eventGroup)
@@ -96,6 +96,11 @@ class SClient(eventGroup: NioEventLoopGroup) {
             })
         }
       }).connect(ip, port).sync().channel()
+
+    c.closeFuture().addListener(new ChannelFutureListener {
+      override def operationComplete(future: ChannelFuture): Unit = map.remove(id)
+    })
+
     map.put(id, c)
     c
   } match {
