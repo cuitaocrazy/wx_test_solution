@@ -46,7 +46,11 @@ class SClient(eventGroup: NioEventLoopGroup) {
             }
           })
       }
-    }).connect(ip, port).sync().channel()
+    }).connect(ip, port).addListener(new ChannelFutureListener {
+    override def operationComplete(future: ChannelFuture): Unit = {
+      println("已建立连接")
+    }
+  }).sync().channel()
 
   serverChannel.closeFuture().addListener(new ChannelFutureListener {
     override def operationComplete(future: ChannelFuture): Unit = {
